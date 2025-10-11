@@ -83,7 +83,8 @@ async def _list_tools_async(json: bool = False):
             hints = [
                 f"{k}={v}"
                 for k, v in os.environ.items()
-                if k.startswith("MCP_") and k.endswith("_URL")
+                if k.startswith("MCP_")
+                and k.endswith("_URL")  # a bit scary to list from .env xD
             ]
             if hints:
                 console.print("[dim]Configured servers:[/]")
@@ -93,12 +94,10 @@ async def _list_tools_async(json: bool = False):
         else:
             console.print(f"[red]Failed to fetch tools:[/] {e}")
 
-        # Don't exit with error - just return empty
         return
     finally:
-        # Clean up client
         try:
-            await client.close()
+            await client.connections.clear()
         except Exception:
             pass
 
@@ -125,7 +124,7 @@ async def _list_tools_async(json: bool = False):
         short_desc = first_line.split(". ")[0].strip()
         if not short_desc.endswith("."):
             short_desc += "."
-        console.print(f"• [bold]{t.name}[/] — {short_desc}")
+        console.print(f"[yellow]•[/] [bold yellow]{t.name}[/] — {short_desc}")
 
 
 @app.command()
@@ -192,9 +191,7 @@ async def _chat_async():
 
                 start = time.time()
 
-                # LangSmith tracing is automatically enabled via env vars:
-                # LANGSMITH_API_KEY, LANGSMITH_PROJECT, LANGSMITH_TRACING
-                # To disable for testing: set LANGSMITH_TRACING=false in .env
+                # Langsmith tracing can be disabled through env variables.
                 result = await session.agent.ainvoke({"messages": session.thread})
 
                 elapsed = time.time() - start
