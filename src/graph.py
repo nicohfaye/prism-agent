@@ -33,8 +33,8 @@ async def build_agent():
         model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
         temperature=0,  # more deterministic
         api_key=api_key,
-        timeout=15,
-        max_retries=1,
+        timeout=45,
+        max_retries=2,
         streaming=True,  # Enable streaming for faster perceived response
     )
 
@@ -48,7 +48,7 @@ async def build_agent():
         else:
             print("No tools available from MCP servers")
     except Exception as e:
-        # Check if it's a connection error (including nested ExceptionGroups)
+        # check if connection errors
         error_str = str(e).lower()
         is_connection_error = (
             "connection" in error_str
@@ -73,9 +73,7 @@ async def build_agent():
             pass
         client = None
 
-    # Create react agent with minimal system prompt
-    # Note: create_react_agent prepends system prompt to EVERY invocation
-    # Keep it short to minimize token overhead
+    # minimal langgraph reAct agent
     agent = create_react_agent(
         model,
         tools,

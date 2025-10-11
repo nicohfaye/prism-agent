@@ -195,7 +195,24 @@ async def _chat_async():
                 result = await session.agent.ainvoke({"messages": session.thread})
 
                 elapsed = time.time() - start
-                console.print(f"[dim]Response time: {elapsed:.2f}s[/]")
+
+                # check if any tools were used in this response
+                tools_used = []
+                for msg in result.get("messages", []):
+                    if hasattr(msg, "tool_calls") and msg.tool_calls:
+                        for tool_call in msg.tool_calls:
+                            tool_name = tool_call.get("name", "unknown")
+                            if tool_name not in tools_used:
+                                tools_used.append(tool_name)
+
+                # display some stats
+                if tools_used:
+                    tools_str = ", ".join(tools_used)
+                    console.print(
+                        f"[dim]Response time: {elapsed:.2f}s | Tools used: [cyan]{tools_str}[/cyan][/]"
+                    )
+                else:
+                    console.print(f"[dim]Response time: {elapsed:.2f}s[/]")
 
                 # Get last message from result
                 last_message = result.get("messages", [])[-1]
