@@ -1,4 +1,4 @@
-# prism-ai
+# Prism-Agent
 
 A sandboxed LangGraph agent with MCP (Model Context Protocol) tool-calling abilities.
 
@@ -8,27 +8,22 @@ A sandboxed LangGraph agent with MCP (Model Context Protocol) tool-calling abili
 - 🔧 MCP protocol support for extensible tools
 - 🐳 Docker-based MCP servers
 - 💬 CLI and FastAPI interfaces
-- 🧹 Proper resource lifecycle management
 
-## Quick Start
+## Prerequisites
+
+This project uses **uv** for python project management and dependencies. [Read the docs here](https://docs.astral.sh/uv/getting-started/installation/)
 
 ### 1. Install Dependencies
 
 ```bash
-# Using uv (recommended)
 uv sync
-
-# Or using pip
-pip install -e .
 ```
 
-### 2. Start MCP Servers (AWS Docs)
+### 2. Start MCP Servers (Docker Compose)
 
 ```bash
-# Start AWS Docs MCP server in Docker
 docker compose up -d
 
-# Verify it's running
 docker ps
 ```
 
@@ -39,7 +34,7 @@ docker ps
 cp .env.example .env
 
 # Edit .env and add your OpenAI API key
-nano .env
+vim .env
 ```
 
 ### 4. Run the Agent
@@ -48,13 +43,6 @@ nano .env
 
 ```bash
 uv run -m src.cli chat
-```
-
-**FastAPI Server:**
-
-```bash
-uvicorn src.server:app --reload
-# Visit http://localhost:8000/docs
 ```
 
 ## Using MCP Tools
@@ -67,7 +55,7 @@ The agent automatically discovers and uses tools from connected MCP servers.
 # In CLI
 uv run -m src.cli tools
 
-# Or in chat
+# or in chat
 you> :tools
 ```
 
@@ -80,91 +68,36 @@ The agent automatically:
 3. Decides when to use tools based on user requests
 4. Executes tools and incorporates results
 
-**Example:**
-
-```
-you> What tools do you have?
-agent> I have access to tools from Context7...
-
-you> Use your tools to help me with X
-agent> *calls appropriate tool* Here's what I found...
-```
-
-## Architecture
-
-```
-┌─────────────────────────────────────┐
-│     Your Application                │
-│  ┌───────────────────────────────┐  │
-│  │  LangGraph Agent              │  │
-│  │  + OpenAI (gpt-4o-mini)       │  │
-│  └─────────────┬─────────────────┘  │
-│                │                     │
-│  ┌─────────────▼─────────────────┐  │
-│  │  MultiServerMCPClient         │  │
-│  │  (LangChain MCP Adapters)     │  │
-│  └─────────────┬─────────────────┘  │
-└────────────────┼─────────────────────┘
-                 │ HTTP (MCP Protocol)
-                 ▼
-┌────────────────────────────────────┐
-│   Docker: MCP Servers              │
-│  ┌──────────────────────────────┐  │
-│  │  AWS Docs (:3011)            │  │
-│  └──────────────────────────────┘  │
-└────────────────────────────────────┘
-```
-
 ## Configuration
 
 Environment variables in `.env`:
 
 ```bash
-# Required
+# required
 OPENAI_API_KEY=sk-your-key
+OPENAI_MODEL=gpt-4o-mini
 
 # MCP Servers
-MCP_AWS_DOCS_URL=http://localhost:3011
+MCP_<NAME>_URL=http://localhost:<PORT>/mcp
 
-# Optional
-OPENAI_MODEL=gpt-4o-mini
+# optional Langsmith tracing for LLM calls
 LANGSMITH_API_KEY=your-key
-LANGSMITH_PROJECT=prism-ai
-```
-
-## Documentation
-
-- [MCP Setup Guide](./MCP_SETUP.md) - Detailed MCP server configuration (AWS Docs)
-- [API Documentation](http://localhost:8000/docs) - FastAPI interactive docs (when server running)
-
-## Development
-
-```bash
-# Run tests (if available)
-pytest
-
-# Format code
-black src/
-
-# Type checking
-mypy src/
+LANGSMITH_PROJECT=your-project
+LANGSMITH_ENDPOINT=https://api.smith.langchain.com
+LANGSMITH_TRACING=true
 ```
 
 ## Project Structure
 
 ```
-prism-ai/
+prism-agent/
 ├── src/
 │   ├── cli.py          # CLI interface
 │   ├── server.py       # FastAPI server
-│   ├── graph.py        # Agent construction
+│   ├── graph.py        # LangGraph Agent
 │   ├── mcp_client.py   # MCP client configuration
 │   └── schemas.py      # Pydantic models
-├── docker-compose.yml  # MCP server definitions (AWS Docs)
+├── docker-compose.yml  # MCP server definitions
 ├── .env.example        # Environment template
 └── README.md
 ```
-
-## License
-
-MIT
