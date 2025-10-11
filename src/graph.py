@@ -9,7 +9,7 @@ from .mcp_client import create_mcp_client
 
 load_dotenv()
 
-# Shortened system prompt to reduce token usage
+# system prompt?
 system_prompt = """You are a snarky assistant. Be brief and end with: "If that's all, I'll retire.\""""
 
 
@@ -33,8 +33,8 @@ async def build_agent():
         model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
         temperature=0,  # more deterministic
         api_key=api_key,
-        timeout=15,  # Reduced to 15 seconds for faster failures
-        max_retries=1,  # Single retry only
+        timeout=15,
+        max_retries=1,
         streaming=True,  # Enable streaming for faster perceived response
     )
 
