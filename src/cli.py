@@ -49,7 +49,7 @@ async def _chat_async(stream: bool = True):
     try:
         console.print("[dim]Initializing agent...[/]")
         await session.init()
-        console.print("[bold yellow]Agent initialized successfully![/]")
+        console.print("[bold green]Agent initialized successfully![/]")
     except ValueError as e:
         # handle config errors (missing api keys etc...)
         console.print(f"[red bold]Configuration Error:[/] {e}")
