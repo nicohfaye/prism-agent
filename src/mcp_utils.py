@@ -145,5 +145,5 @@ async def cleanup_client(client: Optional[MultiServerMCPClient]):
     if client:
         try:
             await client.connections.clear()
-        except Exception:
-            pass  # Silently ignore cleanup errors
+        except Exception as e:
+            console.print(f"[red]Error during client cleanup:[/] {e}")
