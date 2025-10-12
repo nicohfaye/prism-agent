@@ -84,7 +84,8 @@ async def handle_chat_stream(session: Session, stream: bool = True) -> Optional[
     if not stream:
         # Non-streaming mode: use ainvoke
         try:
-            result = await session.agent.ainvoke({"messages": session.thread})
+            with console.status("[dim]Thinking...", spinner="dots"):
+                result = await session.agent.ainvoke({"messages": session.thread})
 
             elapsed = time.time() - start
 
@@ -131,6 +132,11 @@ async def handle_chat_stream(session: Session, stream: bool = True) -> Optional[
     # Streaming mode
     full_response = ""
     tools_used = []
+    first_content_received = False
+
+    # Start spinner
+    status = console.status("[dim]Thinking...", spinner="dots")
+    status.start()
 
     try:
         # Stream the agent's response
@@ -147,29 +153,44 @@ async def handle_chat_stream(session: Session, stream: bool = True) -> Optional[
                         tool_name = tool_call.get("name", "unknown")
                         if tool_name and tool_name not in tools_used:
                             tools_used.append(tool_name)
+                            # stop spinner before showing tool usage
+                            if not first_content_received:
+                                status.stop()
+                                first_content_received = True
                             # show tool usage in real-time
                             print_tool_usage(tool_name)
 
-            # Stream text content as it arrives
+            # stream text content as it arrives
             if kind == "on_chat_model_stream":
                 chunk = event.get("data", {}).get("chunk")
                 if chunk and hasattr(chunk, "content") and chunk.content:
                     content = chunk.content
                     if isinstance(content, str):
+                        # stop spinner on first content
+                        if not first_content_received:
+                            status.stop()
+                            first_content_received = True
                         console.print(content, end="", markup=False)
                         full_response += content
 
         elapsed = time.time() - start
 
-        # Print newline after streaming
+        # stop spinner
+        if not first_content_received:
+            status.stop()
+
+        # print newline after streaming
         console.print()
 
-        # Display stats after streaming completes
+        # stats after response
         print_response_stats(elapsed, tools_used if tools_used else None)
 
         return full_response
 
     except Exception as e:
+        # stop spinner on error
+        if not first_content_received:
+            status.stop()
         error_msg = f"Error: {e}"
         print_error(error_msg)
         return error_msg
