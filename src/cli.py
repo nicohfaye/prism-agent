@@ -95,7 +95,6 @@ async def _chat_async(stream: bool = True):
                 session.add_ai_message(text)
 
     finally:
-        # Always cleanup, even if interrupted
         await session.cleanup()
 
 

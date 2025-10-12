@@ -7,12 +7,12 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 load_dotenv()
 
 
-def create_mcp_client() -> MultiServerMCPClient:
+def get_server_configs() -> Dict[str, Dict[str, Any]]:
     """
-    Create MCP client with configured servers.
+    Get MCP server configurations without creating a client.
 
-    Servers can be configured via environment variables:
-    - MCP_CONTEXT7_URL: Context7 mcp server
+    Returns:
+        Dictionary of server configurations
     """
     servers: Dict[str, Dict[str, Any]] = {}
 
@@ -24,7 +24,6 @@ def create_mcp_client() -> MultiServerMCPClient:
             "url": context7_url,
             "timeout": 10,
         }
-        print(f"Configured Context7 MCP server: {context7_url}")
 
     # Fetch uses stdio transport, not HTTP
     fetch_enabled = os.getenv("MCP_FETCH_ENABLED", "false").lower() == "true"
@@ -34,7 +33,6 @@ def create_mcp_client() -> MultiServerMCPClient:
             "command": "docker",
             "args": ["run", "-i", "--rm", "mcp/fetch"],
         }
-        print("Configured Fetch MCP server via stdio")
 
     time_enabled = os.getenv("MCP_TIME_ENABLED", "false").lower() == "true"
     if time_enabled:
@@ -43,7 +41,27 @@ def create_mcp_client() -> MultiServerMCPClient:
             "command": "docker",
             "args": ["run", "-i", "--rm", "mcp/time"],
         }
-        print("Configured Time MCP server via stdio")
+
+    return servers
+
+
+def create_mcp_client() -> MultiServerMCPClient:
+    """
+    Create MCP client with configured servers.
+
+    Servers can be configured via environment variables:
+    - MCP_CONTEXT7_URL: Context7 mcp server
+    - MCP_FETCH_ENABLED: Enable fetch server
+    - MCP_TIME_ENABLED: Enable time server
+    """
+    servers = get_server_configs()
+
+    # Print configured servers
+    for name, config in servers.items():
+        if config.get("transport") == "streamable_http":
+            print(f"Configured {name.title()} MCP server: {config['url']}")
+        else:
+            print(f"Configured {name.title()} MCP server via stdio")
 
     if not servers:
         print("No MCP servers configured. Agent will run without external tools.")
