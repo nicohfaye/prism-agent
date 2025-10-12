@@ -3,8 +3,36 @@
 from typing import List
 
 from rich.console import Console
+from rich.panel import Panel
+from rich.text import Text
 
 console = Console()
+
+
+def print_startup_banner():
+    """Print a cool ASCII art banner when starting the agent."""
+    banner = r"""
+    ____  ____  ____  _____ __  ___        ___    ____
+   / __ \/ __ \/  _/ / ___//  |/  /       /   |  /  _/
+  / /_/ / /_/ // /   \__ \/ /|_/ /       / /| |  / /  
+ / ____/ _, _// /   ___/ / /  / /       / ___ |_/ /   
+/_/   /_/ |_/___/  /____/_/  /_/       /_/  |_/___/   
+    """
+
+    # Create a colorful text object
+    text = Text(banner, style="bold cyan")
+
+    # Wrap in a panel
+    panel = Panel(
+        text,
+        title="[bold magenta]Prism Agent[/bold magenta]",
+        subtitle="[dim]github.com/nicohfaye[/dim]",
+        border_style="cyan",
+        padding=(0, 2),
+    )
+
+    console.print(panel)
+    console.print()
 
 
 def format_tool_description(description: str) -> str:
