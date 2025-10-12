@@ -5,7 +5,8 @@ from typing import Optional
 
 from rich.console import Console
 
-from .mcp_client import create_mcp_client
+from .mcp_client import get_server_configs
+from .mcp_utils import cleanup_client, get_tools_from_servers, print_server_status
 from .session import Session
 from .ui import (
     print_error,
@@ -13,10 +14,64 @@ from .ui import (
     print_tool,
     print_tool_usage,
     print_warning,
-    show_mcp_connection_error,
 )
 
 console = Console()
+
+
+def _handle_tool_calls(
+    chunk, tools_used: list, status, first_content_received: bool
+) -> bool:
+    """
+    Handle tool call chunks during streaming.
+
+    Args:
+        chunk: The chunk from the stream event
+        tools_used: List to track tool names
+        status: The console status spinner
+        first_content_received: Whether any content has been received yet
+
+    Returns:
+        Updated first_content_received flag
+    """
+    if chunk and hasattr(chunk, "tool_calls") and chunk.tool_calls:
+        for tool_call in chunk.tool_calls:
+            tool_name = tool_call.get("name", "unknown")
+            if tool_name and tool_name not in tools_used:
+                tools_used.append(tool_name)
+                # Stop spinner before showing tool usage
+                if not first_content_received:
+                    status.stop()
+                    first_content_received = True
+                # Show tool usage in real-time
+                print_tool_usage(tool_name)
+    return first_content_received
+
+
+def _handle_content_chunk(
+    chunk, first_content_received: bool, status
+) -> tuple[str, bool]:
+    """
+    Handle content chunks during streaming.
+
+    Args:
+        chunk: The chunk from the stream event
+        first_content_received: Whether any content has been received yet
+        status: The console status spinner
+
+    Returns:
+        Tuple of (content_text, updated first_content_received flag)
+    """
+    if chunk and hasattr(chunk, "content") and chunk.content:
+        content = chunk.content
+        if isinstance(content, str):
+            # Stop spinner on first content
+            if not first_content_received:
+                status.stop()
+                first_content_received = True
+            console.print(content, end="", markup=False)
+            return content, first_content_received
+    return "", first_content_received
 
 
 async def list_tools(json_output: bool = False):
@@ -26,32 +81,33 @@ async def list_tools(json_output: bool = False):
     Args:
         json_output: If True, output as JSON format
     """
-    client = create_mcp_client()
-    try:
-        tool_list = await client.get_tools()
-    except Exception as e:
-        # Check if it's a connection error (including nested ExceptionGroups)
-        error_str = str(e).lower()
-        is_connection_error = (
-            "connection" in error_str
-            or "connect" in error_str
-            or "taskgroup" in error_str  # ExceptionGroups from connection failures
-        )
+    # Get server configurations
+    server_configs = get_server_configs()
 
-        if is_connection_error:
-            show_mcp_connection_error()
-        else:
-            print_error(f"Failed to fetch tools: {e}")
-
+    if not server_configs:
+        print_warning("No MCP servers configured yet (set MCP_*_URL env vars)")
         return
-    finally:
-        try:
-            await client.connections.clear()
-        except Exception:
-            pass
+
+    # Get tools from all servers
+    tool_list, client, results = await get_tools_from_servers(
+        server_configs, verbose=True
+    )
+
+    # Print server status
+    print_server_status(results)
+
+    # Check if any servers connected successfully
+    successful_servers = [name for name, success, _ in results if success]
+
+    if not successful_servers:
+        print_error("All MCP servers failed to connect. Check the errors above.")
+        return
+
+    # Clean up client connections
+    await cleanup_client(client)
 
     if not tool_list:
-        print_warning("No MCP servers configured yet (set MCP_*_URL env vars)")
+        print_warning("No tools available from connected servers")
         return
 
     if json_output:
@@ -64,6 +120,7 @@ async def list_tools(json_output: bool = False):
         )
         return
 
+    console.print(f"[bold]Available Tools ({len(tool_list)}):[/]\n")
     for t in tool_list:
         print_tool(t.name, t.description)
 
@@ -84,7 +141,8 @@ async def handle_chat_stream(session: Session, stream: bool = True) -> Optional[
     if not stream:
         # Non-streaming mode: use ainvoke
         try:
-            result = await session.agent.ainvoke({"messages": session.thread})
+            with console.status("[dim]Thinking...", spinner="dots"):
+                result = await session.agent.ainvoke({"messages": session.thread})
 
             elapsed = time.time() - start
 
@@ -131,6 +189,11 @@ async def handle_chat_stream(session: Session, stream: bool = True) -> Optional[
     # Streaming mode
     full_response = ""
     tools_used = []
+    first_content_received = False
+
+    # Start spinner
+    status = console.status("[dim]Thinking...", spinner="dots")
+    status.start()
 
     try:
         # Stream the agent's response
@@ -139,37 +202,39 @@ async def handle_chat_stream(session: Session, stream: bool = True) -> Optional[
         ):
             kind = event["event"]
 
-            # Track tool calls
+            # Only process chat model stream events
             if kind == "on_chat_model_stream":
                 chunk = event.get("data", {}).get("chunk")
-                if chunk and hasattr(chunk, "tool_calls") and chunk.tool_calls:
-                    for tool_call in chunk.tool_calls:
-                        tool_name = tool_call.get("name", "unknown")
-                        if tool_name and tool_name not in tools_used:
-                            tools_used.append(tool_name)
-                            # show tool usage in real-time
-                            print_tool_usage(tool_name)
 
-            # Stream text content as it arrives
-            if kind == "on_chat_model_stream":
-                chunk = event.get("data", {}).get("chunk")
-                if chunk and hasattr(chunk, "content") and chunk.content:
-                    content = chunk.content
-                    if isinstance(content, str):
-                        console.print(content, end="", markup=False)
-                        full_response += content
+                # Handle tool calls
+                first_content_received = _handle_tool_calls(
+                    chunk, tools_used, status, first_content_received
+                )
+
+                # Handle content streaming
+                content_text, first_content_received = _handle_content_chunk(
+                    chunk, first_content_received, status
+                )
+                full_response += content_text
 
         elapsed = time.time() - start
 
-        # Print newline after streaming
+        # stop spinner
+        if not first_content_received:
+            status.stop()
+
+        # print newline after streaming
         console.print()
 
-        # Display stats after streaming completes
+        # stats after response
         print_response_stats(elapsed, tools_used if tools_used else None)
 
         return full_response
 
     except Exception as e:
+        # stop spinner on error
+        if not first_content_received:
+            status.stop()
         error_msg = f"Error: {e}"
         print_error(error_msg)
         return error_msg

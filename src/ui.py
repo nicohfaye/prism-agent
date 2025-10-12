@@ -1,11 +1,38 @@
 """UI utilities and formatting helpers for the CLI."""
 
-import os
 from typing import List
 
 from rich.console import Console
+from rich.panel import Panel
+from rich.text import Text
 
 console = Console()
+
+
+def print_startup_banner():
+    """Print a cool ASCII art banner when starting the agent."""
+    banner = r"""
+    ____  ____  ____  _____ __  ___        ___    ____
+   / __ \/ __ \/  _/ / ___//  |/  /       /   |  /  _/
+  / /_/ / /_/ // /   \__ \/ /|_/ /       / /| |  / /  
+ / ____/ _, _// /   ___/ / /  / /       / ___ |_/ /   
+/_/   /_/ |_/___/  /____/_/  /_/       /_/  |_/___/   
+    """
+
+    # Create a colorful text object
+    text = Text(banner, style="bold cyan")
+
+    # Wrap in a panel
+    panel = Panel(
+        text,
+        title="[bold magenta]Prism Agent[/bold magenta]",
+        subtitle="[dim]github.com/nicohfaye[/dim]",
+        border_style="cyan",
+        padding=(0, 2),
+    )
+
+    console.print(panel)
+    console.print()
 
 
 def format_tool_description(description: str) -> str:
@@ -53,25 +80,6 @@ def print_info(message: str, dim: bool = True):
 def print_success(message: str):
     """Print a success message."""
     console.print(f"[bold green]{message}[/]")
-
-
-def show_mcp_connection_error():
-    """Show a helpful error message when MCP servers cannot be connected."""
-    console.print("\n[yellow bold]⚠️  Cannot connect to MCP servers[/]")
-    console.print("\n[dim]Make sure Docker containers are running:[/]")
-    console.print("  [cyan]docker-compose up -d[/]\n")
-
-    # Show configured servers
-    hints = [
-        f"{k}={v}"
-        for k, v in os.environ.items()
-        if k.startswith("MCP_") and k.endswith("_URL")
-    ]
-    if hints:
-        console.print("[dim]Configured servers:[/]")
-        for h in hints:
-            console.print(f"  • [dim]{h}[/]")
-    console.print()
 
 
 def print_tool_usage(tool_name: str):

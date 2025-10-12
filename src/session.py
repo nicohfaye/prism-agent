@@ -6,6 +6,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from rich.console import Console
 
 from .graph import build_agent
+from .mcp_utils import cleanup_client
 
 console = Console()
 
@@ -54,13 +55,9 @@ class Session:
         # Clear message history for fresh start next time
         self.thread = []
 
+        await cleanup_client(self.mcp_client)
+
         if self.mcp_client:
-            try:
-                self.mcp_client.connections.clear()
-                console.print(
-                    "[dim]Cleaned up resources and cleared message history[/]"
-                )
-            except Exception as e:
-                console.print(f"[dim]Warning: Error during cleanup: {e}[/]")
+            console.print("[dim]Cleaned up resources and cleared message history[/]")
         else:
             console.print("[dim]Cleared message history[/]")

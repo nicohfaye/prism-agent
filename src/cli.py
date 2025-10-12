@@ -7,6 +7,7 @@ import typer
 
 from .commands import handle_chat_stream, list_tools
 from .session import Session
+from .ui import print_startup_banner
 
 app = typer.Typer(add_completion=False)
 console = Console()
@@ -42,10 +43,13 @@ def chat(
 
 async def _chat_async(stream: bool = True):
     """Async implementation of the chat REPL."""
+
+    print_startup_banner()
+
     try:
         console.print("[dim]Initializing agent...[/]")
         await session.init()
-        console.print("[bold yellow]Agent initialized successfully![/]")
+        console.print("[bold green]Agent initialized successfully![/]")
     except ValueError as e:
         # handle config errors (missing api keys etc...)
         console.print(f"[red bold]Configuration Error:[/] {e}")
@@ -95,7 +99,6 @@ async def _chat_async(stream: bool = True):
                 session.add_ai_message(text)
 
     finally:
-        # Always cleanup, even if interrupted
         await session.cleanup()
 
 
